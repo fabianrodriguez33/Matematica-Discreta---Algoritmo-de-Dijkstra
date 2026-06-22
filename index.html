@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simulador de Grafos Avanzado</title>
+  <title>Simulador</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
@@ -22,12 +22,18 @@
   <aside class="sidebar-left">
 
     <div class="card">
-      <h2>Modo de Trabajo</h2>
-      <div class="grid2">
-        <button class="btn btn-mode active" id="btnModoNodo" onclick="setModo('nodo')">Modo Nodo</button>
-        <button class="btn btn-mode" id="btnModoArco" onclick="setModo('arco')">Modo Arco</button>
-      </div>
-    </div>
+  <h2>Modo de Trabajo</h2>
+  <div class="grid2">
+    <button class="btn btn-mode active" id="btnModoNodo" onclick="setModo('nodo')">Modo Nodo</button>
+    <button class="btn btn-mode" id="btnModoArco" onclick="setModo('arco')">Modo Arco</button>
+  </div>
+  <div class="field" style="margin-top: 8px;">
+    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+      <input type="checkbox" id="chkNoDirigido" style="width: auto; cursor: pointer;">
+      <span>Aristas No Dirigidas (Bidireccionales)</span>
+    </label>
+  </div>
+</div>
 
     <div class="card">
       <h2>Algoritmo</h2>

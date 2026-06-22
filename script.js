@@ -411,35 +411,63 @@ cvs.addEventListener('click', e => {
 });
 
 /* ─── ALGORITMOS ──────────────────────────────────────────── */
+const MAX_ALTERNATIVAS = 15;
+
 function allPaths(start, target) {
   const adj = {};
   nodes.forEach(n => adj[n.id] = []);
   edges.forEach(e => { if (adj[e.from]) adj[e.from].push({ to: e.to, w: e.weight }); });
-  const results = []; const visited = new Set();
+  const results = []; 
+  const visited = new Set();
+  let limitReached = false;
+  
   function dfs(u, path, cost) {
-    if (u === target) { results.push({ path: [...path], cost }); return; }
+    if (limitReached) return;
+    if (u === target) { 
+      results.push({ path: [...path], cost }); 
+      if (results.length >= MAX_ALTERNATIVAS) limitReached = true;
+      return; 
+    }
     visited.add(u);
     for (const { to, w } of adj[u] || []) {
-      if (!visited.has(to)) { path.push(to); dfs(to, path, cost + w); path.pop(); }
+      if (!visited.has(to)) { 
+        path.push(to); 
+        dfs(to, path, cost + w); 
+        path.pop(); 
+        if (limitReached) return;
+      }
     }
     visited.delete(u);
   }
-  dfs(start, [start], 0); return results;
+  dfs(start, [start], 0); 
+  return results;
 }
 
 function dijkstra(s, t) {
-  const dist = {}, prev = {}, vis = new Set();
+  const dist = {}, prev = {};
+  const visited = new Set();
+  const pq = new MinHeap();
+  
   nodes.forEach(n => { dist[n.id] = INF; prev[n.id] = null; });
   dist[s] = 0;
-  while (vis.size < nodes.length) {
-    let u = null, min = INF;
-    nodes.forEach(n => { if (!vis.has(n.id) && dist[n.id] < min) { min = dist[n.id]; u = n.id; } });
-    if (u === null) break; vis.add(u);
-    edges.filter(e => e.from === u && !vis.has(e.to)).forEach(e => {
+  pq.push(s, 0);
+  
+  while (!pq.isEmpty()) {
+    const { node: u } = pq.pop();
+    if (visited.has(u)) continue;
+    visited.add(u);
+    if (u === t) break; // ⚡ Optimización: parar al llegar al destino
+    
+    edges.filter(e => e.from === u && !visited.has(e.to)).forEach(e => {
       const alt = dist[u] + e.weight;
-      if (alt < dist[e.to]) { dist[e.to] = alt; prev[e.to] = u; }
+      if (alt < dist[e.to]) { 
+        dist[e.to] = alt; 
+        prev[e.to] = u;
+        pq.push(e.to, alt);
+      }
     });
   }
+  
   if (dist[t] === INF) return null;
   const path = []; let cur = t;
   while (cur !== null) { path.unshift(cur); cur = prev[cur]; }
@@ -447,24 +475,52 @@ function dijkstra(s, t) {
 }
 
 function floydWarshall(s, t) {
-  const ids = nodes.map(n => n.id); const n = ids.length; const idx = {};
+  const ids = nodes.map(n => n.id); 
+  const n = ids.length; 
+  const idx = {};
   ids.forEach((id, i) => idx[id] = i);
+  
   const dist = Array.from({ length: n }, () => Array(n).fill(INF));
   const next = Array.from({ length: n }, () => Array(n).fill(null));
+  
   ids.forEach((id, i) => dist[i][i] = 0);
+  
   edges.forEach(e => {
     const i = idx[e.from], j = idx[e.to];
-    if (i !== undefined && j !== undefined && e.weight < dist[i][j]) { dist[i][j] = e.weight; next[i][j] = idx[e.to]; }
+    if (i !== undefined && j !== undefined && e.weight < dist[i][j]) { 
+      dist[i][j] = e.weight; 
+      next[i][j] = idx[e.to]; 
+    }
   });
+  
+  // Algoritmo Floyd-Warshall
   for (let k = 0; k < n; k++)
     for (let i = 0; i < n; i++)
       for (let j = 0; j < n; j++)
-        if (dist[i][k] + dist[k][j] < dist[i][j]) { dist[i][j] = dist[i][k] + dist[k][j]; next[i][j] = next[i][k]; }
+        if (dist[i][k] + dist[k][j] < dist[i][j]) { 
+          dist[i][j] = dist[i][k] + dist[k][j]; 
+          next[i][j] = next[i][k]; 
+        }
+  
   const si = idx[s], ti = idx[t];
   if (dist[si][ti] === INF) return null;
-  const path = [s]; let cur = si;
-  while (cur !== ti) { cur = next[cur][ti]; if (cur === null) return null; path.push(ids[cur]); }
-  return { path, cost: dist[si][ti] };
+  
+  const path = [s]; 
+  let cur = si;
+  while (cur !== ti) { 
+    cur = next[cur][ti]; 
+    if (cur === null) return null; 
+    path.push(ids[cur]); 
+  }
+  
+  // ⭐ DEVOLVER TAMBIÉN LAS MATRICES
+  return { 
+    path, 
+    cost: dist[si][ti],
+    distMatrix: dist,  // Matriz de distancias
+    nextMatrix: next,  // Matriz de predecesores
+    ids: ids           // IDs de los nodos en orden
+  };
 }
 
 function calcular() {
@@ -485,7 +541,6 @@ function calcular() {
   const res = algoActivo === 'dijkstra' ? dijkstra(s, t) : floydWarshall(s, t);
   const label = algoActivo === 'dijkstra' ? 'Dijkstra' : 'Floyd-Warshall';
 
-  // Mostrar el panel automáticamente al calcular
   if (panelResults.classList.contains('hidden')) {
     togglePanel(true);
   }
@@ -508,6 +563,20 @@ function calcular() {
   txt += `<span style="color:#16a34a; font-weight:800;">✔ CAMINO ÓPTIMO:</span>\n`;
   txt += `   Ruta: <span style="color:#d97706; font-weight:800">${res.path.join(' → ')}</span>\n`;
   txt += `   Costo: <span style="color:#d97706; font-weight:800">${res.cost}</span>\n\n`;
+
+  // ⭐ MOSTRAR MATRICES SOLO PARA FLOYD-WARSHALL
+if (algoActivo === 'floyd' && res.distMatrix) {
+  txt += `<span style="color:#7c3aed; font-weight:800;">▼ MATRIZ DE DISTANCIAS (Floyd-Warshall)</span>\n`;
+  txt += formatearMatriz(res.distMatrix, res.ids, '');
+  txt += `\n`;
+  
+  // ⭐ CONVERTIR MATRIZ DE PREDECESORES
+  const nextMatrixConIds = convertirMatrizNext(res.nextMatrix, res.ids);
+  
+  txt += `<span style="color:#7c3aed; font-weight:800;">▼ MATRIZ DE PREDECESORES</span>\n`;
+  txt += formatearMatriz(nextMatrixConIds, res.ids, '');
+  txt += `\n`;
+}
   txt += `<span style="color:#64748b; font-weight:700;">▼ ALTERNATIVAS:</span>\n`;
   
   todos.forEach((p, idx) => {
@@ -605,6 +674,160 @@ function render() {
   edges.forEach(drawEdge);
   nodes.forEach(drawNode);
   ctx.restore();
+}
+
+class MinHeap {
+  constructor() { this.heap = []; }
+
+  push(node, priority) {
+    this.heap.push({ node, priority });
+    this._bubbleUp(this.heap.length - 1);
+  }
+
+  pop() {
+    if (this.heap.length === 0) return null;
+    const min = this.heap[0];
+    const end = this.heap.pop();
+    if (this.heap.length > 0) {
+      this.heap[0] = end;
+      this._sinkDown(0);
+    }
+    return min;
+  }
+
+  isEmpty() { return this.heap.length === 0; }
+
+  _bubbleUp(idx) {
+    const element = this.heap[idx];
+    while (idx > 0) {
+      const parentIdx = Math.floor((idx - 1) / 2);
+      const parent = this.heap[parentIdx];
+      if (element.priority >= parent.priority) break;
+      this.heap[parentIdx] = element;
+      this.heap[idx] = parent;
+      idx = parentIdx;
+    }
+  }
+
+  _sinkDown(idx) {
+    const length = this.heap.length;
+    const element = this.heap[idx];
+    while (true) {
+      let leftChildIdx = 2 * idx + 1;
+      let rightChildIdx = 2 * idx + 2;
+      let swapIdx = null;
+
+      if (leftChildIdx < length) {
+        if (this.heap[leftChildIdx].priority < element.priority) {
+          swapIdx = leftChildIdx;
+        }
+      }
+      if (rightChildIdx < length) {
+        if (
+          (swapIdx === null && this.heap[rightChildIdx].priority < element.priority) ||
+          (swapIdx !== null && this.heap[rightChildIdx].priority < this.heap[leftChildIdx].priority)
+        ) {
+          swapIdx = rightChildIdx;
+        }
+      }
+      if (swapIdx === null) break;
+      this.heap[idx] = this.heap[swapIdx];
+      this.heap[swapIdx] = element;
+      idx = swapIdx;
+    }
+  }
+}
+
+function esNoDirigido() {
+  return document.getElementById('chkNoDirigido').checked;
+}
+
+function agregarArco(from, to, w) {
+  if (from === to) return alert('No se permiten lazos reflexivos.');
+  if (!findNode(from) || !findNode(to)) return alert('Nodos no encontrados.');
+  if (!validarPesoNegativo(w)) return false;
+  
+  const ex = edges.find(e => e.from === from && e.to === to);
+  if (ex) ex.weight = w;
+  else edges.push({ from, to, weight: w });
+  
+  // Si es no dirigido, agregar la arista inversa
+  if (esNoDirigido()) {
+    const exReverse = edges.find(e => e.from === to && e.to === from);
+    if (exReverse) exReverse.weight = w;
+    else edges.push({ from: to, to: from, weight: w });
+  }
+  render();
+  return true;
+}
+
+function formatearMatriz(matriz, ids, nombre) {
+  const n = ids.length;
+  if (n === 0) return '';
+  
+  // Calcular el ancho máximo de cada columna
+  const colWidths = ids.map((id, i) => {
+    const maxLen = Math.max(
+      String(id).length,
+      ...matriz.map(row => {
+        const val = row[i];
+        return val === INF ? '∞' : String(val);
+      }).map(s => s.length)
+    );
+    return Math.max(maxLen, 3);
+  });
+  
+  let txt = `<span style="color:#2563eb; font-weight:800;">${nombre}</span>\n`;
+  txt += `┌${'─'.repeat(colWidths[0] + 2)}`;
+  for (let i = 1; i < n; i++) txt += `┬${'─'.repeat(colWidths[i] + 2)}`;
+  txt += `┐\n`;
+  
+  // Encabezado con IDs
+  txt += `│`;
+  ids.forEach((id, i) => {
+    txt += ` ${String(id).padStart(colWidths[i])} `;
+    if (i < n - 1) txt += `│`;
+  });
+  txt += `│\n`;
+  
+  txt += `├${'─'.repeat(colWidths[0] + 2)}`;
+  for (let i = 1; i < n; i++) txt += `┼${'─'.repeat(colWidths[i] + 2)}`;
+  txt += `┤\n`;
+  
+  // Filas de la matriz
+  for (let i = 0; i < n; i++) {
+    txt += `│`;
+    for (let j = 0; j < n; j++) {
+      const val = matriz[i][j];
+      const display = val === INF ? '∞' : String(val);
+      txt += ` ${display.padStart(colWidths[j])} `;
+      if (j < n - 1) txt += `│`;
+    }
+    txt += `│\n`;
+  }
+  
+  txt += `└${'─'.repeat(colWidths[0] + 2)}`;
+  for (let i = 1; i < n; i++) txt += `┴${'─'.repeat(colWidths[i] + 2)}`;
+  txt += `┘\n`;
+  
+  return txt;
+}
+
+function convertirMatrizNext(nextMatrix, ids) {
+  const n = ids.length;
+  const result = Array.from({ length: n }, () => Array(n).fill(null));
+  
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (nextMatrix[i][j] !== null) {
+        result[i][j] = ids[nextMatrix[i][j]]; // Convertir índice a ID real
+      } else {
+        result[i][j] = null;
+      }
+    }
+  }
+  
+  return result;
 }
 
 // Inicializar layout
