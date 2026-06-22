@@ -443,40 +443,63 @@ function allPaths(start, target) {
   return results;
 }
 
+// Variable global para contar operaciones
+let operacionesDijkstra = 0;
+let operacionesFloyd = 0;
+
 function dijkstra(s, t) {
+  operacionesDijkstra = 0; // ⭐ Reiniciar contador
+  
   const dist = {}, prev = {};
   const visited = new Set();
   const pq = new MinHeap();
   
-  nodes.forEach(n => { dist[n.id] = INF; prev[n.id] = null; });
+  nodes.forEach(n => {
+    dist[n.id] = INF;
+    prev[n.id] = null;
+    operacionesDijkstra++; // ⭐ Contar
+  });
+  
   dist[s] = 0;
   pq.push(s, 0);
   
   while (!pq.isEmpty()) {
     const { node: u } = pq.pop();
+    operacionesDijkstra++; // ⭐ Contar cada pop
+    
     if (visited.has(u)) continue;
     visited.add(u);
-    if (u === t) break; // ⚡ Optimización: parar al llegar al destino
     
-    edges.filter(e => e.from === u && !visited.has(e.to)).forEach(e => {
-      const alt = dist[u] + e.weight;
-      if (alt < dist[e.to]) { 
-        dist[e.to] = alt; 
-        prev[e.to] = u;
-        pq.push(e.to, alt);
-      }
-    });
+    if (u === t) break;
+    
+    edges.filter(e => e.from === u && !visited.has(e.to))
+      .forEach(e => {
+        operacionesDijkstra++; // ⭐ Contar cada arista procesada
+        const alt = dist[u] + e.weight;
+        if (alt < dist[e.to]) {
+          dist[e.to] = alt;
+          prev[e.to] = u;
+          pq.push(e.to, alt);
+          operacionesDijkstra++; // ⭐ Contar cada push
+        }
+      });
   }
   
   if (dist[t] === INF) return null;
-  const path = []; let cur = t;
-  while (cur !== null) { path.unshift(cur); cur = prev[cur]; }
+  const path = [];
+  let cur = t;
+  while (cur !== null) {
+    path.unshift(cur);
+    cur = prev[cur];
+  }
   return { path, cost: dist[t] };
 }
 
 function floydWarshall(s, t) {
-  const ids = nodes.map(n => n.id); 
-  const n = ids.length; 
+  operacionesFloyd = 0; // ⭐ Reiniciar contador
+  
+  const ids = nodes.map(n => n.id);
+  const n = ids.length;
   const idx = {};
   ids.forEach((id, i) => idx[id] = i);
   
@@ -487,58 +510,61 @@ function floydWarshall(s, t) {
   
   edges.forEach(e => {
     const i = idx[e.from], j = idx[e.to];
-    if (i !== undefined && j !== undefined && e.weight < dist[i][j]) { 
-      dist[i][j] = e.weight; 
-      next[i][j] = idx[e.to]; 
+    if (i !== undefined && j !== undefined && e.weight < dist[i][j]) {
+      dist[i][j] = e.weight;
+      next[i][j] = idx[e.to];
     }
   });
   
-  // Algoritmo Floyd-Warshall
+  // ⭐ CONTAR LAS OPERACIONES DE LOS 3 BUCLES
   for (let k = 0; k < n; k++)
     for (let i = 0; i < n; i++)
-      for (let j = 0; j < n; j++)
-        if (dist[i][k] + dist[k][j] < dist[i][j]) { 
-          dist[i][j] = dist[i][k] + dist[k][j]; 
-          next[i][j] = next[i][k]; 
+      for (let j = 0; j < n; j++) {
+        operacionesFloyd++; // ⭐ Contar cada iteración
+        if (dist[i][k] + dist[k][j] < dist[i][j]) {
+          dist[i][j] = dist[i][k] + dist[k][j];
+          next[i][j] = next[i][k];
         }
+      }
   
   const si = idx[s], ti = idx[t];
   if (dist[si][ti] === INF) return null;
   
-  const path = [s]; 
+  const path = [s];
   let cur = si;
-  while (cur !== ti) { 
-    cur = next[cur][ti]; 
-    if (cur === null) return null; 
-    path.push(ids[cur]); 
+  while (cur !== ti) {
+    cur = next[cur][ti];
+    if (cur === null) return null;
+    path.push(ids[cur]);
   }
   
-  // ⭐ DEVOLVER TAMBIÉN LAS MATRICES
-  return { 
-    path, 
+  return {
+    path,
     cost: dist[si][ti],
-    distMatrix: dist,  // Matriz de distancias
-    nextMatrix: next,  // Matriz de predecesores
-    ids: ids           // IDs de los nodos en orden
+    distMatrix: dist,
+    nextMatrix: next,
+    ids: ids
   };
 }
 
 function calcular() {
   const s = parseInt(selInicio.value), t = parseInt(selFinal.value);
-  if (!s || !t) return alert('Selecciona los nodos válidos de Inicio y Fin.');
-  if (s === t) return alert('El nodo de inicio y final no pueden ser el mismo.');
-
-  const tieneNegativos = edges.some(e => e.weight < 0);
-  if (tieneNegativos && algoActivo === 'dijkstra') {
-    alert('⚠️ El grafo contiene aristas con pesos negativos.\n\n' +
-          'Dijkstra NO puede procesarlas correctamente.\n\n' +
-          'Cambia al algoritmo Floyd-Warshall o elimina/modifica las aristas negativas.');
-    return;
-  }
+  if (!s || !t) return alert('Selecciona nodos válidos.');
+  if (s === t) return alert('Inicio y final no pueden ser el mismo.');
 
   highlightEdges.clear(); highlightNodes.clear();
 
+  // ⭐ MEDIR TIEMPO
+  const inicio = performance.now();
+  
   const res = algoActivo === 'dijkstra' ? dijkstra(s, t) : floydWarshall(s, t);
+  
+  const fin = performance.now();
+  const tiempoMs = (fin - inicio).toFixed(3);
+  
+  // ⭐ CAPTURAR LAS OPERACIONES
+  const ops = algoActivo === 'dijkstra' ? operacionesDijkstra : operacionesFloyd;
+  
   const label = algoActivo === 'dijkstra' ? 'Dijkstra' : 'Floyd-Warshall';
 
   if (panelResults.classList.contains('hidden')) {
@@ -546,7 +572,7 @@ function calcular() {
   }
 
   if (!res) {
-    resultsBox.innerHTML = `<span style="color:#dc2626; font-weight:800;">✘ [${label}] No se encontró ruta factible entre el Nodo ${s} y el Nodo ${t}.</span>`;
+    resultsBox.innerHTML = `<span style="color:#dc2626; font-weight:800;">✘ [${label}] No se encontró ruta.</span>`;
     render(); return;
   }
 
@@ -559,24 +585,28 @@ function calcular() {
   const todos = allPaths(s, t).sort((a,b) => a.cost - b.cost);
 
   let txt = `<span style="color:#2563eb; font-weight:800;">▼ MÉTODO: ${label.toUpperCase()}</span>\n`;
+  
+  // ⭐ MOSTRAR TIEMPO Y OPERACIONES
+  txt += `<span style="color:#059669; font-weight:800;">⏱ Tiempo: ${tiempoMs} ms</span>\n`;
+  txt += `<span style="color:#dc2626; font-weight:800;">🔢 Operaciones: ${ops.toLocaleString()}</span>\n`;
+  txt += `<span style="color:#64748b; font-size:0.85rem;">Nodos: ${nodes.length} | Aristas: ${edges.length}</span>\n`;
   txt += `────────────────────────────────────────\n`;
+  
   txt += `<span style="color:#16a34a; font-weight:800;">✔ CAMINO ÓPTIMO:</span>\n`;
   txt += `   Ruta: <span style="color:#d97706; font-weight:800">${res.path.join(' → ')}</span>\n`;
   txt += `   Costo: <span style="color:#d97706; font-weight:800">${res.cost}</span>\n\n`;
 
-  // ⭐ MOSTRAR MATRICES SOLO PARA FLOYD-WARSHALL
-if (algoActivo === 'floyd' && res.distMatrix) {
-  txt += `<span style="color:#7c3aed; font-weight:800;">▼ MATRIZ DE DISTANCIAS (Floyd-Warshall)</span>\n`;
-  txt += formatearMatriz(res.distMatrix, res.ids, '');
-  txt += `\n`;
-  
-  // ⭐ CONVERTIR MATRIZ DE PREDECESORES
-  const nextMatrixConIds = convertirMatrizNext(res.nextMatrix, res.ids);
-  
-  txt += `<span style="color:#7c3aed; font-weight:800;">▼ MATRIZ DE PREDECESORES</span>\n`;
-  txt += formatearMatriz(nextMatrixConIds, res.ids, '');
-  txt += `\n`;
-}
+  if (algoActivo === 'floyd' && res.distMatrix) {
+    txt += `<span style="color:#7c3aed; font-weight:800;">▼ MATRIZ DE DISTANCIAS (Floyd-Warshall)</span>\n`;
+    txt += formatearMatriz(res.distMatrix, res.ids, '');
+    txt += `\n`;
+    
+    const nextMatrixConIds = convertirMatrizNext(res.nextMatrix, res.ids);
+    txt += `<span style="color:#7c3aed; font-weight:800;">▼ MATRIZ DE PREDECESORES</span>\n`;
+    txt += formatearMatriz(nextMatrixConIds, res.ids, '');
+    txt += `\n`;
+  }
+
   txt += `<span style="color:#64748b; font-weight:700;">▼ ALTERNATIVAS:</span>\n`;
   
   todos.forEach((p, idx) => {
